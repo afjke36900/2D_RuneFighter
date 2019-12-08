@@ -1,15 +1,17 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using UnityEngine.Events;
+using System.Collections;
 
-public class Enemy_AI : MonoBehaviour
+
+public class WolfBossAI : MonoBehaviour
 {
     #region 欄位
     [Header("玩家")]
     public Transform player;//玩家
     [Header("敵人初始位置")]
-    public Vector3 begin;//敵人初始位置 
+    public Vector3 begin;//敵人初始位置    
     [Header("遊走半徑")]
     public float wanderRadius = 6;//遊走半徑
     [Header("追擊半徑")]
@@ -17,7 +19,7 @@ public class Enemy_AI : MonoBehaviour
     [Header("自衛半徑")]
     public float defend = 5;//自衛半徑    
     [Header("衝刺半徑")]
-    public float chargeRadius= 3;//衝刺半徑
+    public float chargeRadius = 3;//衝刺半徑
     [Header("衝刺速度")]
     public float chargespeed = 1.63f;//衝刺速度    
     [Header("遊走速度")]
@@ -31,18 +33,27 @@ public class Enemy_AI : MonoBehaviour
     [Header("是否正在衝刺")]
     public bool ischarge = false;
     [Header("能否衝刺")]
-    public bool b = true;
+    public bool CanCharge = true;
     [Header("計時器")]
-    public float timer = 0;
+    public float timer;
+    [Header("呼叫計時器")]
+    public float timer2;
+    [Header("呼叫間隔"), Range(0f, 120f)]
+    public float CallTime = 60f;
+    [Header("原地呼叫時間") , Range(0f , 10f)]
+    public float CallWait = 5f;
+    [Header("是否正在呼叫")]
+    public bool isCall = false;
     /// <summary>
     /// 敵人狀態
     /// </summary>
     public enum MonsterState
     {
         Stand,
+        Charge,
         Walk,
         Chase,
-        charge,
+        Call,
         Return
     }
     [Header("當前狀態")]
@@ -76,13 +87,16 @@ public class Enemy_AI : MonoBehaviour
 
     void Update()
     {
+        CallCheck();
+        timer2 += Time.deltaTime;
         switch (currentState)
         {
+            
             //待機狀態
             case MonsterState.Stand:
                 if (Time.time - lastAct > actResttime)
                 {
-                    b = true;
+                    CanCharge = true;
                     RandomAction(); //時間到隨機切換      
                 }
                 //檢測用方法
@@ -98,17 +112,17 @@ public class Enemy_AI : MonoBehaviour
                     RandomAction();
                 }
                 //檢查是否追擊
-                WanderRadiusCheck();
+                EnemyDistanceCheck();
                 break;
             //追擊狀態
             case MonsterState.Chase:
                 timer = 0;
-                if (is_Running == false)
+                if (is_Running == false && isCall == false)
                 {
                     is_Running = true;
                 }
                 //若不是在衝刺中 追擊玩家
-                if (ischarge == false)
+                if (ischarge == false && isCall == false)
                 {
                     transform.up = -(player.position - transform.position);
                     transform.position += -transform.up * Time.deltaTime * runSpeed;
@@ -119,20 +133,20 @@ public class Enemy_AI : MonoBehaviour
                 }
                 break;
             //衝刺狀態
-            case MonsterState.charge:
+            case MonsterState.Charge:
                 transform.up = -(player.position - transform.position);
                 timer += Time.deltaTime;//開始計時
-                if(timer>=2.5 && timer <= 2.8)
+                if (timer >= 2.5 && timer <= 2.8)
                 {
                     chargepoint = transform.position + (player.position - transform.position) * 1.5f;
                 }
                 // 2.5~3秒間為玩家反應時間
                 if (timer >= 3 && timer <= 3.5)
                 {
-                    if (b == true)//若可以衝刺
+                    if (CanCharge == true)//若可以衝刺
                     {
-                        
-                        b = false;
+
+                        CanCharge = false;
                         Debug.Log(chargepoint);
 
                     }
@@ -146,9 +160,18 @@ public class Enemy_AI : MonoBehaviour
                     //轉為追擊狀態
                     currentState = MonsterState.Chase;
                     //重設能否衝刺
-                    b = true;
+                    CanCharge = true;
                 }
                 break;
+            case MonsterState.Call:
+                if(timer2 >= CallTime + CallWait)
+                {
+                    timer2 = 0;
+                    isCall = false;
+                    currentState = MonsterState.Chase;
+                }
+                break;
+
             //返回狀態
             case MonsterState.Return:
                 transform.up = -(begin - transform.position);
@@ -159,10 +182,11 @@ public class Enemy_AI : MonoBehaviour
 
         }
         //衝次完冷卻
-        if (b == false)
+        if (CanCharge == false && isCall == false)
         {
             transform.rotation = new Quaternion(0, 0, 0, 0);
         }
+     
     }
     #endregion
 
@@ -193,25 +217,15 @@ public class Enemy_AI : MonoBehaviour
     void EnemyDistanceCheck()
     {
         enemyToPlayer = Vector2.Distance(player.transform.position, transform.position);
-        if (enemyToPlayer < defend)
+        if (enemyToPlayer < defend && ischarge == false)
         {
             currentState = MonsterState.Chase;
+            CanCharge = true;
         }
 
     }
 
-    /// <summary>
-    /// 檢測玩家距離與遊走範圍
-    /// </summary>
-    void WanderRadiusCheck()
-    {
-        enemyToPlayer = Vector2.Distance(player.transform.position, transform.position);
-        enemyBegin = Vector2.Distance(transform.position, begin);
-        if (enemyToPlayer < defend)
-        {
-            currentState = MonsterState.Chase;
-        }
-    }
+    
 
     /// <summary>
     /// 檢查是否在追擊範圍內
@@ -234,7 +248,7 @@ public class Enemy_AI : MonoBehaviour
         if (enemyBegin < 0.5f)
         {
             is_Running = false;
-            
+            RandomAction();
         }
     }
     /// <summary>
@@ -246,9 +260,18 @@ public class Enemy_AI : MonoBehaviour
         if (enemyBegin < chargeRadius)
         {
 
-            currentState = MonsterState.charge;
+            currentState = MonsterState.Charge;
             timer = 0;
         }
     }
-}
+    void CallCheck()
+    {
+        if(timer2 >= CallTime)
+        {
+            isCall = true;
+            currentState = MonsterState.Call;
+        }
+    }
 
+   
+}
