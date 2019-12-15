@@ -12,6 +12,7 @@ public class character_control : MonoBehaviour
     public float RBoundary;
     public float UBoundary;
     public float DBoundary;
+    public Animator ani; 
     void Start()
     {
         CharacterRigidbody = GetComponent<Rigidbody2D>();
@@ -27,15 +28,33 @@ public class character_control : MonoBehaviour
             if (Input.GetKey(KeyCode.RightArrow))
             {
                 CharacterRigidbody.velocity=new Vector3(1f, 0, 0);
+                ani.SetBool("right", true);
             }
-           
+            else
+            {
+                ani.SetBool("right", false);
+
+            }
+
             if (Input.GetKey(KeyCode.LeftArrow))
             {
                 CharacterRigidbody.velocity = new Vector3(-1f, 0, 0);
+                ani.SetBool("left", true);
+            }
+            else
+            {
+                ani.SetBool("left", false);
             }
             if (Input.GetKey(KeyCode.UpArrow))
             {
                 CharacterRigidbody.velocity = new Vector3(0, 1f, 0);
+                ani.SetBool("back", true);
+
+            }
+            else
+            {
+                ani.SetBool("back", false);
+
             }
             if (Input.GetKey(KeyCode.DownArrow))
             {
